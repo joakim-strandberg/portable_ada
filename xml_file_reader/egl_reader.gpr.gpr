@@ -1,0 +1,35 @@
+project Hello_World is
+
+   for Source_Dirs use (".");
+
+   for Object_Dir use "obj";
+
+   for Main use ("egl_reader_main.adb");
+
+   package Builder is
+
+      for Global_Configuration_Pragmas use "egl_reader_global.adc";
+
+   end Builder;
+
+   package Compiler is
+
+      for Switches ("Ada") use
+        (
+         "-gnaty",
+         "-g"--,
+         --  "-Og"
+        );
+
+   end Compiler;
+
+   package Binder is
+
+      for Switches ("Ada") use
+        (
+         "-Es"
+        );
+
+   end Binder;
+
+end Hello_World;

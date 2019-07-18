@@ -1,0 +1,44 @@
+--  What is XML? XML is acronym for Extensible Markup Language.
+--
+--  A bunch of bytes make up an XML document if it contains an
+--  optional XML declaration followed by an XML element.
+--  An XML element consists of a start tag, closing tag and some content.
+--  For example: <age>12</age>
+--  In this example <age> is the start tag, </age> is the closing tag
+--  and 12 is the content. In XML content can be plain text,
+--  other XML elements, XML entities and comments.
+--
+--  The first line in a XML document is the XML declaration.
+--  It is optional but its presence indicates that the collection of bytes
+--  is an XML document and to which version of XML it conforms.
+--
+--  Elements, Tags or Nodes?
+--
+--   - An XML element consists of an opening tag, its attributes, any content,
+--     and a closing tag.
+--   - An XML tag - either opening or closing - is used to mark the start
+--     or end of an element.
+--   - An XML node is a part of the hierarchical/tree structure that makes
+--     up an XML document. "Node" is a generic term that applies to any
+--     type of XML document object, including elements, attributes,
+--     comments, processing instructions and plain text.
+--
+--  Entities
+--
+--  An entity allows you to define special characters for insertion
+--  into your documents. If you've worked with HTML, you know that
+--  the &lt; entity inserts a literal < character into a document.
+--  You can't use the actual character because it would be treated
+--  as the start of a tag, so you replace it with
+--  the appropriate entity instead.
+--
+--  XML, true to its extensible nature, allows you to create your own entities.
+--  Let's say that your company's copyright notice has to go on
+--  every single document. Instead of typing this notice over and over again,
+--  you could create an entity reference called copyright_notice with
+--  the proper text, then use it in your XML documents as &copyright_notice;.
+--
+package Std.XML is
+   --  This package exists mainly as a place to store documentation about
+   --  what XML is. Hence, the documentation above.
+end Std.XML;
