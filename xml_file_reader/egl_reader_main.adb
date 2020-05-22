@@ -1,4 +1,5 @@
 with EGL_Reader.Main;
+pragma Elaborate_All (EGL_Reader.Main);
 
 --  This file exists because Corder (part of the Janus/Ada compiler toolkit)
 --  doesn't support nested subprograms.
@@ -14,6 +15,11 @@ with EGL_Reader.Main;
 --
 --  All heap blocks were freed -- no leaks are possible
 --
+--
+--  Today:
+--  HEAP SUMMARY:
+--      in use at exit: 0 bytes in 0 blocks
+--    total heap usage: 26 allocs, 26 frees, 1,108,364 bytes allocated
 procedure EGL_Reader_Main is
 begin
    EGL_Reader.Main;

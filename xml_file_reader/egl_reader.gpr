@@ -20,6 +20,8 @@ project Egl_Reader is
 
       for Switches ("Ada") use
         (
+         "-O3",
+         "-flto",
          "-gnaty",
          "-g"
         );
@@ -34,5 +36,14 @@ project Egl_Reader is
         );
 
    end Binder;
+
+   package Linker is
+
+      for Switches ("Ada") use
+        (
+         "-flto"
+        );
+
+   end Linker;
 
 end Egl_Reader;

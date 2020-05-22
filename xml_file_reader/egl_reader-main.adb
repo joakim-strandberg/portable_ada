@@ -1,81 +1,99 @@
 with Ada.Text_IO.Text_Streams;
 with Ada.Streams.Stream_IO;
-with Std.Ada_Extensions; use Std.Ada_Extensions;
-with Std.XML.DOM_Parser.Text_IO;
-with Std.Containers.Unbounded_Octet_Vectors;
-with Std.Containers.Text_IO;
-with Std.File_IO;
+
+with Std.Ada_Extensions;
+use  Std.Ada_Extensions;
+pragma Elaborate_All (Std.Ada_Extensions);
 
 procedure EGL_Reader.Main is
 
-   use Std.XML.DOM_Parser;
-   use Std.File_IO;
    use Node_Iterator_Vectors;
-   use Ada.Streams.Stream_IO;
 
-   Shall_Print_Debug_Info : constant Boolean := False;
+   use type Std.XML_UTF8_DOM_Parsers.UTF8_Text;
+   use type Std.XML_UTF8_DOM_Parsers.XML_Element_Attributes;
+   use type Std.XML_UTF8_DOM_Parsers.XML_Element_Children;
 
-   Egl_XML_Filename : aliased String := "egl.xml";
+   Egl_XML_Filename : constant String := "egl.xml";
 
-   Egl_XML_File_Reader : Std.File_IO.File_Reader
-     (Name                   => Egl_XML_Filename'Access,
-      Initial_Elements_Count => 256 * 1024);
-
-   Pool : aliased Std.XML.DOM_Parser.Memory_Pool;
-
-   Root_Node : Std.XML.DOM_Parser.XML_Node_Ptr;
+   Root_Node : Std.XML_UTF8_DOM_Parsers.XML_Node_Const_Ptr;
 
    procedure Read_Egl_XML_File;
-   procedure Initialize_Memory_Pool;
    procedure Parse_XML;
    procedure Create_Output_File;
    procedure Initialize_Nodes;
    procedure Use_File;
-   procedure Print_Statistics;
 
    procedure Read_Egl_XML_File is
+      File : Ada.Streams.Stream_IO.File_Type;
+
       Call_Result : Subprogram_Call_Result;
+
+      procedure Open_Input_File;
+      procedure Read_All_Contents_Of_Input_File;
+
+      procedure Open_Input_File is
+      begin
+         Ada.Streams.Stream_IO.Open
+           (File => File,
+            Mode => Ada.Streams.Stream_IO.In_File,
+            Name => Egl_XML_Filename);
+         Read_All_Contents_Of_Input_File;
+      end Open_Input_File;
+
+      procedure Read_All_Contents_Of_Input_File is
+
+         procedure Read_File;
+
+         Is_End_Of_File_Reached : Boolean := False;
+
+         procedure Read_File is
+            Buffer : Octet_Array (1 .. 1024);
+            Count  : Octet_Offset;
+         begin
+            for I in Pos32'Range loop
+               if Ada.Streams.Stream_IO.End_Of_File (File) then
+                  Is_End_Of_File_Reached := True;
+                  exit;
+               end if;
+               Ada.Streams.Stream_IO.Read
+                 (File => File,
+                  Item => Buffer,
+                  Last => Count);
+               for I in Buffer'First .. Count loop
+                  File_Contents (Next_File_Index) := Buffer (I);
+                  Next_File_Index := Next_File_Index + 1;
+               end loop;
+            end loop;
+         end Read_File;
+
+      begin
+         Read_File;
+
+         if not Is_End_Of_File_Reached then
+            Call_Result := (Has_Failed => True,
+                            Codes      => (1200128260, -1400763670));
+         end if;
+      end Read_All_Contents_Of_Input_File;
+
    begin
-      Initialize (Egl_XML_File_Reader, Call_Result);
-      if Is_Success (Call_Result) then
-         Initialize_Memory_Pool;
+      Open_Input_File;
+      if not Call_Result.Has_Failed then
+         Parse_XML;
       else
          Ada.Text_IO.Put_Line (Message (Call_Result));
       end if;
-      Finalize (Egl_XML_File_Reader);
-   exception
-      when others =>
-         Finalize (Egl_XML_File_Reader);
-         raise;
    end Read_Egl_XML_File;
 
-   Input_File : Ada.Streams.Stream_IO.File_Type;
-
-   procedure Initialize_Memory_Pool is
-   begin
-      begin
-         Initialize (Pool);
-         Parse_XML;
-      exception
-         when others =>
-            Finalize (Pool);
-            raise;
-      end;
-      Finalize (Pool);
-   end Initialize_Memory_Pool;
-
    procedure Parse_XML is
-      Call_Result : Extended_Subprogram_Call_Result;
+      Call_Result : Subprogram_Call_Result;
    begin
-      Parse
+      Std.XML_UTF8_DOM_Parsers.Parse
         (Pool        => Pool'Access,
          XML_Message =>
-           File_Contents
-             (Egl_XML_File_Reader).all
-             (1 .. Last_Index (Egl_XML_File_Reader)),
+           File_Contents (1 .. Next_File_Index - 1),
          Call_Result => Call_Result,
          Root_Node   => Root_Node);
-      if Has_Failed (Call_Result) then
+      if Call_Result.Has_Failed then
          Ada.Text_IO.Put_Line (Message (Call_Result));
       else
          Ada.Text_IO.Put_Line
@@ -105,18 +123,10 @@ procedure EGL_Reader.Main is
       Ada.Text_IO.Close (File);
    end Create_Output_File;
 
-   Nodes : Node_Iterator_Vectors.Vector (8);
-
    procedure Initialize_Nodes is
    begin
       Stream := Ada.Text_IO.Text_Streams.Stream (File);
-      Initialize (Nodes);
       Use_File;
-      Finalize (Nodes);
-   exception
-      when others =>
-         Finalize (Nodes);
-         raise;
    end Initialize_Nodes;
 
    procedure Use_File is
@@ -129,13 +139,11 @@ procedure EGL_Reader.Main is
 
          procedure Handle_Node is
             N : constant Node_Iterator_Vectors.Element_Ptr
-              := Last_Element_Reference (Nodes);
+              := Node_Iterator_Vectors.Last_Element_Reference (Nodes'Access);
             Parent : constant Node_Iterator_Index := Last_Index (Nodes);
 
-            Children : constant Std.XML.DOM_Parser.Node_Ptr_Array
-              := Std.XML.DOM_Parser.Node_Children
-                (Pool    => Pool,
-                 Element => N.Element.all);
+            Children : constant Std.XML_UTF8_DOM_Parsers.Node_Const_Ptr_Array
+              := (+N.Element.Element.Children);
 
             procedure Handle_XML_Tag;
 
@@ -147,27 +155,22 @@ procedure EGL_Reader.Main is
                   Depth : constant Extended_Octet_Offset
                     := Extended_Octet_Offset
                       (Node_Iterator_Vectors.Last_Index (Nodes));
-                  Attributes : constant Std.XML.DOM_Parser.Attribute_Ptr_Array
-                    := Std.XML.DOM_Parser.Tag_Attributes
-                      (Pool => Pool,
-                       Key  => N.Element.Attributes_Key);
+                  Attributes : constant
+                    Std.XML_UTF8_DOM_Parsers.Attribute_Ptr_Array
+                      := +N.Element.Element.Attributes;
                begin
                   for I in Attributes'Range loop
                      Ada.Streams.Write
                        (Stream.all, ((1 .. Depth => +(' '))));
                      Ada.Streams.Write
                        (Stream.all,
-                        (+"Attribute name: ") &
-                          Std.XML.DOM_Parser.Text
-                          (Pool, Attributes (I).Name));
+                        (+"Attribute name: ") & (+Attributes (I).Name));
                      Ada.Text_IO.New_Line (File);
                      Ada.Streams.Write
                        (Stream.all, ((1 .. Depth => +(' '))));
                      Ada.Streams.Write
                        (Stream.all,
-                        (+"Attribute value: ") &
-                          Std.XML.DOM_Parser.Text
-                          (Pool, Attributes (I).Value));
+                        (+"Attribute value: ") & (+Attributes (I).Value));
                      Ada.Text_IO.New_Line (File);
                   end loop;
                end Print_Attributes;
@@ -179,7 +182,7 @@ procedure EGL_Reader.Main is
                Ada.Streams.Write (Stream.all, ((1 .. Depth => +(' '))));
                Ada.Streams.Write
                  (Stream.all,
-                  (+"Tag name: ") & Text (Pool, N.Element.Name));
+                  (+"Tag name: ") & (+N.Element.Element.Name));
                Ada.Text_IO.New_Line (File);
 
                Print_Attributes;
@@ -198,12 +201,10 @@ procedure EGL_Reader.Main is
                Shall_Continue_Loop : in out Boolean) is
             begin
                case Children (I).Id is
-                  when Node_Kind_Tag =>
+                  when Std.XML_UTF8_DOM_Parsers.Node_Kind_Tag =>
                      declare
                         Item : constant Node_Iterator
-                          := (Element =>
-                                Std.XML.DOM_Parser.Element
-                                  (Pool, Children (I).Component_Key),
+                          := (Element => Children (I),
                               Child_Index  => 0,
                               Parent_Index => Parent);
                      begin
@@ -214,27 +215,24 @@ procedure EGL_Reader.Main is
                      N.Child_Index := I + 1;
                      Shall_Delete := False;
                      Shall_Continue_Loop := False;
-                  when Node_Kind_Comment =>
+                  when Std.XML_UTF8_DOM_Parsers.Node_Kind_Comment =>
                      Ada.Streams.Write (Stream.all, ((1 .. Depth => +(' '))));
                      Ada.Streams.Write
                        (Stream.all,
-                        (+"Comment: ") &
-                          Text (Pool, Children (I).Component_Key));
+                        (+"Comment: ") & (+Children (I).Text));
                      Ada.Text_IO.New_Line (File);
-                  when Node_Kind_CDATA =>
+                  when Std.XML_UTF8_DOM_Parsers.Node_Kind_CDATA =>
                      Ada.Streams.Write (Stream.all, ((1 .. Depth => +(' '))));
                      Ada.Streams.Write
                        (Stream.all,
-                        (+"CDATA: ") &
-                          Text (Pool, Children (I).Component_Key));
+                        (+"CDATA: ") & (+Children (I).Text));
                      Ada.Text_IO.New_Line (File);
-                  when Node_Kind_Text =>
+                  when Std.XML_UTF8_DOM_Parsers.Node_Kind_Text =>
                      Ada.Streams.Write
                        (Stream.all, ((1 .. Depth => +(' '))));
                      Ada.Streams.Write
                        (Stream.all,
-                        (+"Text: ") &
-                          Text (Pool, Children (I).Component_Key));
+                        (+"Text: ") & (+Children (I).Text));
                      Ada.Text_IO.New_Line (File);
                end case;
             end Handle_Loop_Iteration;
@@ -287,12 +285,10 @@ procedure EGL_Reader.Main is
 
    begin
       case Root_Node.Id is
-         when Node_Kind_Tag =>
+         when Std.XML_UTF8_DOM_Parsers.Node_Kind_Tag =>
             declare
                Item : constant Node_Iterator
-                 := (Element =>
-                       Std.XML.DOM_Parser.Element
-                         (Pool, Root_Node.Component_Key),
+                 := (Element => Root_Node,
                      Child_Index  => 0,
                      Parent_Index => 1);
             begin
@@ -301,30 +297,13 @@ procedure EGL_Reader.Main is
             end;
 
             Do_Work;
-            if Shall_Print_Debug_Info then
-               Print_Statistics;
-            end if;
-         when Node_Kind_Comment |
-              Node_Kind_CDATA |
-              Node_Kind_Text =>
+         when Std.XML_UTF8_DOM_Parsers.Node_Kind_Comment |
+              Std.XML_UTF8_DOM_Parsers.Node_Kind_CDATA |
+              Std.XML_UTF8_DOM_Parsers.Node_Kind_Text =>
             Ada.Text_IO.Put_Line
               ("Root node in xml file is of wrong type");
       end case;
    end Use_File;
-
-   procedure Print_Statistics is
-      Statistics : Std.Containers.Statistics_Unbounded_Vector;
-
-      Pool_Statistics : Std.XML.DOM_Parser.Memory_Pool_Statistics;
-   begin
-      Node_Iterator_Vectors.Statistics (Nodes, Statistics);
-      Std.XML.DOM_Parser.Statistics (Pool, Pool_Statistics);
-      Std.Containers.Text_IO.Put_Line
-        (Name       => "Nodes (used for iterating through the egl.xml)",
-         Statistics => Statistics);
-      Std.XML.DOM_Parser.Text_IO.Put_Line
-        ("Memory_Pool", Pool_Statistics);
-   end Print_Statistics;
 
 begin
    Read_Egl_XML_File;

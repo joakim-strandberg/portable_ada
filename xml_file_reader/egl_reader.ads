@@ -1,19 +1,27 @@
-with Std.Ada_Extensions; use Std.Ada_Extensions;
-with Std.Containers.Unbounded_Vectors;
-with Std.XML.DOM_Parser;
-
+with Std.Ada_Extensions;
+use  Std.Ada_Extensions;
 pragma Elaborate_All (Std.Ada_Extensions);
-pragma Elaborate_All (Std.Containers.Unbounded_Vectors);
-pragma Elaborate_All (Std.XML.DOM_Parser);
+
+with Std.Bounded_Vectors;
+pragma Elaborate_All (Std.Bounded_Vectors);
+
+with Std.XML_UTF8_DOM_Parsers;
+pragma Elaborate_All (Std.XML_UTF8_DOM_Parsers);
 
 package EGL_Reader is
 
 private
 
+   Pool : aliased Std.XML_UTF8_DOM_Parsers.Memory_Pool;
+
+   File_Contents : Octet_Array (1 .. 256 * 1024);
+
+   Next_File_Index : Octet_Offset := 1;
+
    type Node_Iterator_Index is new Pos32;
 
    type Node_Iterator is record
-      Element     : Std.XML.DOM_Parser.XML_Element_Ptr;
+      Element     : Std.XML_UTF8_DOM_Parsers.XML_Node_Const_Ptr;
       --  Should maybe be constant ptr?
 
       Child_Index : Nat32;
@@ -31,10 +39,11 @@ private
    type Node_Iterator_Array is
      array (Node_Iterator_Index range <>) of aliased Node_Iterator;
 
-   package Node_Iterator_Vectors is new
-     Std.Containers.Unbounded_Vectors
-       (Element_Type   => Node_Iterator,
-        Index          => Node_Iterator_Index,
-        Elements_Array => Node_Iterator_Array);
+   package Node_Iterator_Vectors is new Std.Bounded_Vectors
+     (Element_Type   => Node_Iterator,
+      Index          => Node_Iterator_Index,
+      Elements_Array => Node_Iterator_Array);
+
+   Nodes : aliased Node_Iterator_Vectors.Vector (16);
 
 end EGL_Reader;

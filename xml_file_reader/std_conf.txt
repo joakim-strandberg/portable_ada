@@ -1,0 +1,2 @@
+Operating system: Windows
+Architecture: 32
